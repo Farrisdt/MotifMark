@@ -9,7 +9,9 @@ def get_args():
     parser = argparse.ArgumentParser(description="Takes in a fasta file and a text file with one motif per line. Returns an image of the locations of motifs on given sequences.")
     parser.add_argument("-f", "--fasta_file", help="Path to sorted fasta file", type=str, required=True)
     parser.add_argument("-m", "--motifs_file", help="Path to motif file", type=str, required=True)
-    parser.add_argument("-t", "--theme", default="vintage", help="Color theme for image. Leave blank for default. Options are light, dark, and vintage.", type=str, required=False)
+    parser.add_argument("-t", "--theme", default="vintage", help="Color theme for image. Leave blank for default (vintage). Options are classic, light, dark, mono, contrast, viridi(color blind friendly), and vintage.", type=str, required=False)
+    parser.add_argument("-s", "--stagger", default="False", help="Changes formatting of motifs to be below sequence and staggered if True. Default is False", type=str, required=False)
+    parser.add_argument("-d", "--dense", default="False", help="Changes formatting of motifs to be solid if True. Default is False. Motifs are more transparent to show overlaps.", type=str, required=False)
     return parser.parse_args()
 args = get_args()
 
@@ -99,10 +101,11 @@ class Theme:
         self.strokecolor = [.1, .1, .1,self.alpha]
         self.assign_colors
         self.panelbuffer = 5
-
+        self.stagger = args.stagger
         self.legendsize = 100
         self.itemheight = 25 #height of lables
         self.textbuffer = 7
+        self.dense = args.dense
 
         #self.theme = theme
     def __repr__(self):
@@ -112,6 +115,8 @@ class Theme:
         newcolor = [color[0]/250, color[1]/250, color[2]/250, self.alpha]
         return newcolor
     def assign_colors(self):
+        if self.dense == "True":
+            self.alpha = 0.6
         if self.colorscheme == "light":
             self.strokecolor = self.translate_color([98, 113, 138])
             self.motifcolors = [self.translate_color([168, 83, 181]), self.translate_color([242, 19, 83]), self.translate_color([103, 168, 45]), self.translate_color([10, 141, 207]), self.translate_color([34, 189, 189])]
@@ -129,6 +134,15 @@ class Theme:
             self.motifcolors = [self.translate_color([168, 83, 181]), self.translate_color([242, 19, 83]), self.translate_color([103, 168, 45]), self.translate_color([8, 108, 158]), self.translate_color([242, 139, 5])]
             self.backgroundcolor = [1,1,1,0]
             self.strokecolor = [.1, .1, .1,self.alpha]
+        if self.colorscheme == "viridi":
+            self.motifcolors = [self.translate_color([162, 12, 193]), self.translate_color([64, 14, 160]), self.translate_color([21, 182, 191]), self.translate_color([60, 226, 10]), self.translate_color([28, 158, 67])]
+            self.backgroundcolor = self.translate_color([255, 250, 227])
+            self.strokecolor = self.translate_color([105, 81, 56,])
+        if self.colorscheme == "contrast":
+            self.motifcolors = [self.translate_color([87, 15, 112]), self.translate_color([6, 148, 53]), self.translate_color([212, 135, 11]), self.translate_color([17, 79, 171]), self.translate_color([247, 12, 55])]
+            self.backgroundcolor = [1,1,1,0]
+            self.strokecolor = [.1, .1, .1,self.alpha]
+        self.strokecolor[3] = 0.8
 
 class Figure:
     '''The figure to be drawn.'''
@@ -199,40 +213,80 @@ class Figure:
         context.rectangle(0, 0, length, theme.buffer)
         context.fill()
         for sequence in self.sequences:
-            buffer = theme.buffer
-            panel = dim[1]
-            sectionbuffer = theme.itemheight+theme.panelbuffer
-            section = panel+sectionbuffer
-            linelength = len(sequence.sequence)
-            linebuffer = theme.buffer + (.5*(dim[2]-linelength)) #used to center lines in page
-            center= buffer + item*section + .5*panel #denotes veritcal center of curr subfig
-            ## create background ##
-            color = self.theme.backgroundcolor
-            context.set_source_rgb(color[0], color[1], color[2])
-            context.rectangle(0, section*item+buffer, length, section)
-            context.fill()
-            ## create sequence line ##
-            context.set_line_width(1)
-            color = self.theme.strokecolor
-            context.set_source_rgb(color[0], color[1], color[2])
-            context.move_to(linebuffer,center)
-            context.line_to(linelength+linebuffer,center)
-            context.stroke()
-            ## Create exons ##
-            for exon in sequence.exons:
-                context.set_source_rgba(color[0], color[1], color[2], color[3])
-                context.rectangle(exon[0]+linebuffer,center-20,exon[1],40)
+            if theme.stagger == "True":
+                buffer = theme.buffer
+                panel = dim[1]
+                sectionbuffer = theme.itemheight+theme.panelbuffer
+                section = panel+sectionbuffer
+                linelength = len(sequence.sequence)
+                linebuffer = theme.buffer + (.5*(dim[2]-linelength)) #used to center lines in page
+                center= buffer + item*section + .5*panel-.25*section #denotes veritcal center of curr subfig
+                ## create background ##
+                color = self.theme.backgroundcolor
+                context.set_source_rgb(color[0], color[1], color[2])
+                context.rectangle(0, section*item+buffer, length, section)
                 context.fill()
-            colornum = 0
-            ## Create motifs ##
-            for motif in sequence.motifs:
-                motif_length = len(motif[0])
-                color = self.theme.motifcolors[colornum]
-                context.set_source_rgba(color[0], color[1], color[2], color[3])
-                for loc in motif[1]:
-                    context.rectangle(loc+linebuffer,center-30+colornum,motif_length,60-colornum*2)
-                    context.stroke()
-                colornum +=1
+                ## create sequence line ##
+                context.set_line_width(1)
+                color = self.theme.strokecolor
+                context.set_source_rgb(color[0], color[1], color[2])
+                context.move_to(linebuffer,center)
+                context.line_to(linelength+linebuffer,center)
+                context.stroke()
+                ## Create exons ##
+                for exon in sequence.exons:
+                    context.set_source_rgba(color[0], color[1], color[2], color[3])
+                    context.rectangle(exon[0]+linebuffer,center-10,exon[1],20)
+                    context.fill()
+                colornum = 0
+                ## Create motifs ##
+                for motif in sequence.motifs:
+                    motif_length = len(motif[0])
+                    color = self.theme.motifcolors[colornum]
+                    context.set_source_rgba(color[0], color[1], color[2], color[3])
+                    for loc in motif[1]:
+                        context.rectangle(loc+linebuffer,center+colornum*10+15,motif_length,10)
+                        context.fill()
+                    colornum +=1
+            
+            else:
+                buffer = theme.buffer
+                panel = dim[1]
+                sectionbuffer = theme.itemheight+theme.panelbuffer
+                section = panel+sectionbuffer
+                linelength = len(sequence.sequence)
+                linebuffer = theme.buffer + (.5*(dim[2]-linelength)) #used to center lines in page
+                center= buffer + item*section + .5*panel #denotes veritcal center of curr subfig
+                ## create background ##
+                color = self.theme.backgroundcolor
+                context.set_source_rgb(color[0], color[1], color[2])
+                context.rectangle(0, section*item+buffer, length, section)
+                context.fill()
+                ## create sequence line ##
+                context.set_line_width(1)
+                color = self.theme.strokecolor
+                context.set_source_rgb(color[0], color[1], color[2])
+                context.move_to(linebuffer,center)
+                context.line_to(linelength+linebuffer,center)
+                context.stroke()
+                ## Create exons ##
+                for exon in sequence.exons:
+                    context.set_source_rgba(color[0], color[1], color[2], color[3])
+                    context.rectangle(exon[0]+linebuffer,center-20,exon[1],40)
+                    context.fill()
+                colornum = 0
+                ## Create motifs ##
+                for motif in sequence.motifs:
+                    motif_length = len(motif[0])
+                    color = self.theme.motifcolors[colornum]
+                    context.set_source_rgba(color[0], color[1], color[2], color[3])
+                    for loc in motif[1]:
+                        context.rectangle(loc+linebuffer,center-30+colornum,motif_length,60-colornum*2)
+                        if(theme.dense == "True"):
+                            context.fill()
+                        else:
+                            context.stroke()
+                    colornum +=1
             ## Create labels ##
             color = self.theme.strokecolor
             context.set_source_rgba(color[0], color[1], color[2])
