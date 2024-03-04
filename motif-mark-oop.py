@@ -25,7 +25,7 @@ Amatch = {"W", "M", "R", "D", "H", "V"}
 Cmatch = {"S", "M", "Y", "B", "H", "V"}
 Gmatch = {"S", "K", "R", "B", "D", "V"}
 outputfile = re.findall("([^.]+)", fasta)[0] #matches output file name to input fasta name
-outputfile = outputfile + ".svg"
+outputfile = outputfile + ".png"
 ### OBJECTS ###
 class Sequence:
     '''A genetic sequence'''
@@ -209,7 +209,7 @@ class Figure:
         self.legend = legend
         itemheight = self.theme.itemheight
         length=(dim[2]+(self.theme.buffer*2))+legend
-        surface = cairo.SVGSurface(outputfile, length, theme.figsize)
+        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, length, theme.figsize)
         context = cairo.Context(surface)
         item = 0 # curr subfigure
         # create top buffer
@@ -308,6 +308,7 @@ class Figure:
         context.set_source_rgb(color[0], color[1], color[2])
         context.rectangle(0, theme.buffer+(dim[1]+itemheight+theme.panelbuffer)*len(self.sequences), length, theme.buffer)
         context.fill()
+        surface.write_to_png(outputfile)
         surface.finish()
 
 ### GLOBAL FUNCTIONS ###
@@ -344,10 +345,12 @@ def create_sequences(filelist: list):
     return(filelist)
 
 def translate_motif(motif, section):
-    '''check if section matches motif, convert motif letters into ATCG while checking. Section anf motif must be same length. Return true or false'''
+    '''Check if each letter of give kmer is acceptable for the motif. Section and motif must be same length. Return true or false'''
+    # Capitalize everyhting
     motif = motif.upper()
     section = section.upper()
     motifs = []
+    # See if motif letter is one of the matches for given letter, based on the sets in the global variables section.
     for i in range(len(section)):
         letter = section[i]
         curr = motif[i]
@@ -385,7 +388,7 @@ output = create_sequences(import_fasta_file(fasta))
 for item in output:
     item.place_motifs(motifs)
     item.place_codingblocks()
-theme = Theme(len(output)*100+100, 25, args.theme) #figure size can be changed but this autofits nicely.
+theme = Theme((len(output)*100+100), 25, args.theme) #figure size can be changed but this autofits nicely.
 theme.assign_colors()
 fig = Figure(output, theme)
 fig.draw_figure()
