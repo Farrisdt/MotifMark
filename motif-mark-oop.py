@@ -19,13 +19,13 @@ args = get_args()
 fasta = args.fasta_file
 motifsfile = args.motifs_file
 DNA = {"A", "T", "C", "G"}
+# sets of valid matches to ATCG respectivly
 Tmatch = {"U", "W", "K", "Y", "B", "D", "H"}
 Amatch = {"W", "M", "R", "D", "H", "V"}
 Cmatch = {"S", "M", "Y", "B", "H", "V"}
 Gmatch = {"S", "K", "R", "B", "D", "V"}
-outputfile = re.findall("([^.]+)", fasta)[0]
+outputfile = re.findall("([^.]+)", fasta)[0] #matches output file name to input fasta name
 outputfile = outputfile + ".svg"
-# print("DON'T FORGET TO CHANGE OUTPUT TO PNG")
 ### OBJECTS ###
 class Sequence:
     '''A genetic sequence'''
@@ -64,7 +64,7 @@ class Sequence:
 
     def place_codingblocks(self):
         '''Assigns list of tuples to exons and introns based on capitalization in sequence. Tuples hold start location and length.'''
-        Ilocations = []
+        Ilocations = [] #currently introns are not being used, possible future functionality
         Elocations = []
         sequence = self.sequence
         start = 0
@@ -89,7 +89,7 @@ class Sequence:
         self.introns = Ilocations
 
 class Theme:
-    '''The theme for figure.'''
+    '''The theme for figure. Includes color scheme, spacing sizes, and transparensy values.'''
     def __init__(self, figsize=int, buffer=int, color=str):
         ## Data ##
         self.figsize = figsize #height of figure
@@ -111,11 +111,11 @@ class Theme:
     def __repr__(self):
         rep = 'Theme:'#include specs here + self.size + 'sequences'
         return rep
-    def translate_color(self, color: list):
+    def translate_color(self, color: list): #pycairo takes colors as  0-1 % of rgb values. This translates normal rgb numbers into the correct format.
         newcolor = [color[0]/250, color[1]/250, color[2]/250, self.alpha]
         return newcolor
     def assign_colors(self):
-        if self.dense == "True":
+        if self.dense == "True": #makes motifs solid and transparent instead of hollow and more solid.
             self.alpha = 0.6
         if self.colorscheme == "light":
             self.strokecolor = self.translate_color([98, 113, 138])
@@ -124,21 +124,21 @@ class Theme:
             self.backgroundcolor = self.translate_color([14, 23, 36])
             self.strokecolor = self.translate_color([225, 236, 252])
             self.motifcolors = [self.translate_color([168, 83, 181]), self.translate_color([242, 19, 83]), self.translate_color([103, 168, 45]), self.translate_color([10, 141, 207]), self.translate_color([34, 189, 189])]
-        if self.colorscheme == "vintage":
+        if self.colorscheme == "vintage": #modeled after vintage apple colors.
             self.motifcolors = [self.translate_color([97,187, 70]), self.translate_color([253,184,39]), self.translate_color([245,130,31]), self.translate_color([224,58,62]), self.translate_color([150,61,151])]
             self.backgroundcolor = self.translate_color([245,231,206])
             self.strokecolor = self.translate_color([94,41,47])
-        if self.colorscheme == "mono":
+        if self.colorscheme == "mono": #intended for black and white printing
             self.motifcolors = [self.translate_color([34, 5, 45]), self.translate_color([86, 54, 97]), self.translate_color([119, 92, 127]), self.translate_color([160, 133, 166]), self.translate_color([204, 179, 209])]
         if self.colorscheme == "classic":
             self.motifcolors = [self.translate_color([168, 83, 181]), self.translate_color([242, 19, 83]), self.translate_color([103, 168, 45]), self.translate_color([8, 108, 158]), self.translate_color([242, 139, 5])]
             self.backgroundcolor = [1,1,1,0]
             self.strokecolor = [.1, .1, .1,self.alpha]
-        if self.colorscheme == "viridi":
+        if self.colorscheme == "viridi": #intended to be color blind friendly.
             self.motifcolors = [self.translate_color([162, 12, 193]), self.translate_color([64, 14, 160]), self.translate_color([21, 182, 191]), self.translate_color([60, 226, 10]), self.translate_color([28, 158, 67])]
             self.backgroundcolor = self.translate_color([255, 250, 227])
             self.strokecolor = self.translate_color([105, 81, 56,])
-        if self.colorscheme == "contrast":
+        if self.colorscheme == "contrast": #darker motifs for higher contrast with background and less eye strain.
             self.motifcolors = [self.translate_color([87, 15, 112]), self.translate_color([6, 148, 53]), self.translate_color([212, 135, 11]), self.translate_color([17, 79, 171]), self.translate_color([247, 12, 55])]
             self.backgroundcolor = [1,1,1,0]
             self.strokecolor = [.1, .1, .1,self.alpha]
@@ -162,16 +162,19 @@ class Figure:
         buffer = theme.buffer
         labelheight = theme.itemheight+theme.panelbuffer
         longest=0
+        # finds longest sequence to scale all sequence graphs
         for item in sequences:
             if longest < len(item.sequence):
                 longest = len(item.sequence)
+        # There is a lot of math here, it should auto-fit everything but may wig out if buffers or fig size is edited too much.
+        # height is the size of the entire sequence figure including label and buffers while panelsize is the section dedicated to the sequence itself.
         panelsize = ((theme.figsize - 2*buffer)/len(sequences)) - labelheight
-        panel = int(theme.figsize/len(sequences)-theme.itemheight) #int rounds any 0.5 remainder down to nearest 
         height = 2*buffer + (panelsize+labelheight)
         return (height, panelsize, longest)
     def draw_legend(self,length,context):
-        '''Creates motifs on figure'''
+        '''Creates the color key on the top right of the figure.'''
         num=1
+        # Sizes legend
         longestmotif = self.longestmotif
         legend = self.legend
         textbuffer = self.theme.textbuffer
@@ -182,9 +185,11 @@ class Figure:
         buffer = self.theme.buffer/2
         context.rectangle(length-buffer, buffer, -50-(longestmotif*textbuffer), itemheight*(len(motifs)+1))
         context.stroke()
+        # Title
         context.move_to(length-legend/2-buffer-20, buffer+15)
         context.show_text("LEGEND")
         context.stroke()
+        # Adds motif names and colors
         for motif in motifs:
             color = self.theme.strokecolor
             context.set_source_rgb(color[0], color[1], color[2])
@@ -197,7 +202,7 @@ class Figure:
             context.fill()
             num+=1
     def draw_figure(self):
-        '''Creates image'''
+        '''Creates final image.'''
         dim = self.dimensions()
         self.longestmotif = len(max(self.sequences[0].motiflist, key = len))
         legend = 50+(self.longestmotif*self.theme.textbuffer)
@@ -207,13 +212,14 @@ class Figure:
         surface = cairo.SVGSurface(outputfile, length, theme.figsize)
         context = cairo.Context(surface)
         item = 0 # curr subfigure
-        ## create top buffer ##
+        # create top buffer
         color = self.theme.backgroundcolor
         context.set_source_rgb(color[0], color[1], color[2])
         context.rectangle(0, 0, length, theme.buffer)
         context.fill()
+        # Fill in sequence section
         for sequence in self.sequences:
-            if theme.stagger == "True":
+            if theme.stagger == "True": #for stagger placement theme
                 buffer = theme.buffer
                 panel = dim[1]
                 sectionbuffer = theme.itemheight+theme.panelbuffer
@@ -246,10 +252,12 @@ class Figure:
                     context.set_source_rgba(color[0], color[1], color[2], color[3])
                     for loc in motif[1]:
                         context.rectangle(loc+linebuffer,center+colornum*10+15,motif_length,10)
-                        context.fill()
+                        if(theme.dense == "True"):
+                            context.fill()
+                        else:
+                            context.stroke()
                     colornum +=1
-            
-            else:
+            else: #normal placement theme
                 buffer = theme.buffer
                 panel = dim[1]
                 sectionbuffer = theme.itemheight+theme.panelbuffer
@@ -377,7 +385,7 @@ output = create_sequences(import_fasta_file(fasta))
 for item in output:
     item.place_motifs(motifs)
     item.place_codingblocks()
-theme = Theme(len(motifs)*100+100, 25, args.theme)
+theme = Theme(len(output)*100+100, 25, args.theme) #figure size can be changed but this autofits nicely.
 theme.assign_colors()
 fig = Figure(output, theme)
 fig.draw_figure()
